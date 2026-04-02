@@ -482,7 +482,11 @@ func RunGA(req Request) ([]Response, float64, int) {
 			}
 		}
 
-		if scores[iBest] > (bestFitnessEver + 0.001) {
+		if scores[iBest] > bestFitnessEver {
+			bestFitnessEver = scores[iBest]
+		}
+
+		if scores[iBest] > (bestFitnessEver + 0.0001) {
 			bestFitnessEver = scores[iBest]
 			stagnationCounter = 0
 		} else {
