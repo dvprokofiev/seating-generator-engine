@@ -202,36 +202,42 @@ func checkPref(student optStudent, row, col int) float64 {
 }
 
 func checkFriends(studentIdx int, seating []int, row, col int, config ClassConfig, friends SocialMap, n int, friendsCount []int) float64 {
+	if friendsCount[studentIdx] == 0 {
+		return 0.0
+	}
+
 	score := 0.0
-	for dcol := -1; dcol <= 1; dcol++ {
-		for drow := -1; drow <= 1; drow++ {
-			if dcol == 0 && drow == 0 {
+	// Define local search radius to keep algorithm effective
+	radius := 3
+
+	for drow := -radius; drow <= radius; drow++ {
+		for dcol := -radius; dcol <= radius; dcol++ {
+			if drow == 0 && dcol == 0 {
 				continue
 			}
+
 			nrow, ncol := row+drow, col+dcol
-			if nrow < 0 || nrow >= config.Rows || ncol < 0 || ncol >= config.Columns {
-				continue
-			}
+
+			if nrow >= 0 && nrow < config.Rows && ncol >= 0 && ncol < config.Columns {
 			neighborIdx := seating[nrow*config.Columns+ncol]
-			if neighborIdx < 0 || neighborIdx >= n {
-				continue
-			}
-			if friends[studentIdx*n+neighborIdx] {
-				if drow == 0 && isSameDesk(col, ncol, config.deskType) {
-					score += 1
-				} else if abs(drow) == 1 && abs(dcol) == 0 {
-					score += 0.7
-				} else if abs(drow) == 0 && abs(dcol) == 1 {
-					score += 0.5
-				} else {
-					score += 0.2
+
+				if neighborIdx >= 0 && neighborIdx < n && friends[studentIdx*n+neighborIdx] {
+					dist := float64(abs(drow) + abs(dcol))
+
+					if dist <= float64(radius) {
+						contribution := 1.0 / dist
+						// extra points if friends are sitting at the same desk
+						if dist == 1 && drow == 0 && isSameDesk(col, ncol, config.deskType) {
+							contribution *= 1.2
+						}
+						score += contribution
 				}
 			}
 		}
 	}
-	if friendsCount[studentIdx] == 0 {
-		return 0.0
 	}
+
+	// normalize score
 	finalScore := score / float64(friendsCount[studentIdx])
 	if finalScore > 1.0 {
 		return 1.0
