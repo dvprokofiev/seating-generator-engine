@@ -150,12 +150,11 @@ func buildSocialMap(req Request, idToIndex map[int]int) (SocialMap, SocialMap, [
 	return friends, enemies, friendsCount, enemiesCount
 }
 
-func scorePosition(row, totalRows int, fill float64) float64 {
+func scorePosition(row, totalRows int) float64 {
 	if totalRows <= 1 {
 		return 1.0
 	}
-	baseGradient := 1.0 - (float64(row) / float64(totalRows-1))
-	return baseGradient * fill
+	return 1.0 - (float64(row) / float64(totalRows-1))
 }
 
 func isSameDesk(col1, col2 int, seatType string) bool {
@@ -193,7 +192,7 @@ func checkPref(student optStudent, row, col int) float64 {
 		maxPossible += 1.0
 	}
 	if maxPossible == 0 {
-		return 1.0
+		return 0.0
 	}
 	if student.pCols[col] {
 		score += 1.0
@@ -298,6 +297,10 @@ func checkEnemies(studentIdx int, seating []int, row, col int, config ClassConfi
 
 func fitness(seating []int, config ClassConfig, w Weights, friends SocialMap, enemies SocialMap, staticScores []float64, nStudents int, friendsCount []int, enemiesCount []int) float64 {
 	score := 0.0
+	sumWeights := w.FriendBonus + w.EnemyPenalty + w.MedPenalty + w.PrefBonus + w.RowBonus
+	if sumWeights == 0 {
+		sumWeights = 1
+	}
 	for i, studentIdx := range seating {
 		if studentIdx < 0 || studentIdx >= nStudents {
 			continue
@@ -309,9 +312,11 @@ func fitness(seating []int, config ClassConfig, w Weights, friends SocialMap, en
 		sScore := (fScore * w.FriendBonus) - (ePenalty * w.EnemyPenalty)
 		sScore += staticScores[studentIdx*config.Rows*config.Columns+i]
 
+		sScore /= sumWeights
+
 		score += sScore
 	}
-	return score
+	return score / float64(nStudents)
 }
 
 func CrossOver(r *rand.Rand, parent1, parent2, child []int, used []bool) {
@@ -408,15 +413,15 @@ func RunGA(req Request) ([]Response, float64, int) {
 			r, c := seatIdx/req.ClassConfig.Columns, seatIdx%req.ClassConfig.Columns
 			mScore := checkMed(opt[i], r, c)
 			pScore := checkPref(opt[i], r, c)
-			rScore := scorePosition(r, req.ClassConfig.Rows, weights.RowBonus)
+			rScore := scorePosition(r, req.ClassConfig.Rows)
 
-			val := (pScore * weights.PrefBonus) + (rScore * weights.RowBonus)
 			if mScore > 0 {
-				val += mScore * weights.MedPenalty
+				mScore = weights.MedPenalty
 			} else if mScore < 0 {
-				val -= weights.MedPenalty
+				mScore = -weights.MedPenalty
 			}
-			staticScores[i*N+seatIdx] = val
+
+			staticScores[i*N+seatIdx] = (pScore * weights.PrefBonus) + (rScore * weights.RowBonus) + mScore
 		}
 	}
 
@@ -559,41 +564,51 @@ func RunGA(req Request) ([]Response, float64, int) {
 func getSatisfactionDetails(seating []int, row, col, studentIndex int, w Weights, config ClassConfig, friends, enemies SocialMap, friendsCount []int, enemiesCount []int, students []optStudent) SatisfactionDetails {
 	var details SatisfactionDetails
 	student := students[studentIndex]
+
 	mScore := checkMed(student, row, col)
 	pScore := checkPref(student, row, col)
 	fScore := checkFriends(studentIndex, seating, row, col, config, friends, len(students), friendsCount)
 	ePenalty := checkEnemies(studentIndex, seating, row, col, config, enemies, len(students), enemiesCount)
-	rScore := scorePosition(row, config.Rows, w.RowBonus)
+	rScore := scorePosition(row, config.Rows)
 
-	details.Medical = mScore * w.MedPenalty
-	details.Pref = pScore * w.PrefBonus
-	details.Friends = fScore * w.FriendBonus
-	details.RowBonus = rScore * w.RowBonus
-	details.Enemies = -(ePenalty * w.EnemyPenalty)
-
-	details.Total = details.Medical + details.Pref + details.Friends + details.RowBonus + details.Enemies
-
-	maxPossible := w.RowBonus
-
-	if len(student.mCols) > 0 || len(student.mRows) > 0 {
-		maxPossible += w.MedPenalty
+	pMax := 0.0
+	if len(student.mRows) > 0 || len(student.mCols) > 0 {
+		pMax += w.MedPenalty
 	}
-
-	if len(student.PreferredColumns) > 0 || len(student.PreferredRows) > 0 {
-		maxPossible += w.PrefBonus
+	if len(student.pRows) > 0 || len(student.pCols) > 0 {
+		pMax += w.PrefBonus
 	}
-
 	if friendsCount[studentIndex] > 0 {
-		maxPossible += w.FriendBonus
+		pMax += w.FriendBonus
 	}
 
-	currentGood := (mScore * w.MedPenalty) + (pScore * w.PrefBonus) +
-		(fScore * w.FriendBonus) + (rScore * w.RowBonus) - (ePenalty * w.EnemyPenalty)
+	if pMax == 0 {
+		details.Total = 1.0
 
-	if maxPossible <= 0 {
-		details.Level = 1.0
+		details.Level = 0.9 + (0.1 * rScore)
+
+		details.Medical = 0
+		details.Pref = 0
+		details.Friends = 0
+		details.Enemies = 0
+		details.RowBonus = rScore
 	} else {
-		details.Level = currentGood / maxPossible
+		details.Medical = (mScore * w.MedPenalty) / pMax
+		if details.Medical < 0 {
+			details.Medical = 0
+		}
+
+		details.Pref = (pScore * w.PrefBonus) / pMax
+		details.Friends = (fScore * w.FriendBonus) / pMax
+
+		details.Enemies = -(ePenalty * w.EnemyPenalty) / pMax
+
+		details.Total = details.Medical + details.Pref + details.Friends + details.Enemies
+
+		bonusImpact := 0.05
+		details.RowBonus = rScore * bonusImpact
+
+		details.Level = details.Total + details.RowBonus
 	}
 
 	if details.Level < 0 {
