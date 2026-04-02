@@ -174,10 +174,9 @@ func checkMed(student optStudent, row, col int) float64 {
 		if rowMatch && colMatch {
 			return 1.0
 		}
-		return -1.0
-	}
-	if rowMatch || colMatch {
-		return 1.0
+		if rowMatch || colMatch {
+			return 0.0
+		}
 	}
 	return -1.0
 }
