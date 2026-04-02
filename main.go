@@ -88,6 +88,10 @@ func generateSeatingHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Too much students!", http.StatusBadRequest)
 		log.Printf("Task: %d - canceled - too much students", len(req.Students))
 		return
+	} else if len(req.Students) > req.ClassConfig.Columns*req.ClassConfig.Rows {
+		http.Error(w, "Classroom is too small for this much students", http.StatusBadRequest)
+		log.Printf("Task: %d - canceled - classroom is too small for this much students", len(req.Students))
+		return
 	}
 	log.Printf("Task: %d students, config %dx%d",
 		len(req.Students), req.ClassConfig.Rows, req.ClassConfig.Columns)
