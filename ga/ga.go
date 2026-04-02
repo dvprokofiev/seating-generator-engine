@@ -239,7 +239,7 @@ func checkFriends(studentIdx int, seating []int, row, col int, config ClassConfi
 	}
 
 	// normalize score
-	finalScore := score / float64(friendsCount[studentIdx])
+	finalScore := score / (float64(friendsCount[studentIdx]) * 1.2)
 	if finalScore > 1.0 {
 		return 1.0
 	}
