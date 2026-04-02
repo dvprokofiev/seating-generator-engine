@@ -306,7 +306,7 @@ func fitness(seating []int, config ClassConfig, w Weights, friends SocialMap, en
 		fScore := checkFriends(studentIdx, seating, row, col, config, friends, nStudents, friendsCount)
 		ePenalty := checkEnemies(studentIdx, seating, row, col, config, enemies, nStudents, enemiesCount)
 
-		sScore := (fScore * w.FriendBonus * 100.0) - (ePenalty * w.EnemyPenalty * 5.0 * 100.0)
+		sScore := (fScore * w.FriendBonus) - (ePenalty * w.EnemyPenalty)
 		sScore += staticScores[studentIdx*config.Rows*config.Columns+i]
 
 		score += sScore
@@ -414,9 +414,9 @@ func RunGA(req Request) ([]Response, float64, int) {
 			if mScore > 0 {
 				val += mScore * weights.MedPenalty
 			} else if mScore < 0 {
-				val -= weights.MedPenalty * 20.0
+				val -= weights.MedPenalty
 			}
-			staticScores[i*N+seatIdx] = val * 100.0
+			staticScores[i*N+seatIdx] = val
 		}
 	}
 
@@ -565,55 +565,48 @@ func getSatisfactionDetails(seating []int, row, col, studentIndex int, w Weights
 	ePenalty := checkEnemies(studentIndex, seating, row, col, config, enemies, len(students), enemiesCount)
 	rScore := scorePosition(row, config.Rows, w.RowBonus)
 
-	details.Medical = 0
-	if mScore > 0 {
-		details.Medical = mScore * w.MedPenalty
-	} else if mScore < 0 {
-		details.Medical = -w.MedPenalty * 10.0
-	}
+	details.Medical = mScore * w.MedPenalty
 	details.Pref = pScore * w.PrefBonus
 	details.Friends = fScore * w.FriendBonus
 	details.RowBonus = rScore * w.RowBonus
-	details.Enemies = ePenalty * w.EnemyPenalty * -5.0
+	details.Enemies = -(ePenalty * w.EnemyPenalty)
+
 	details.Total = details.Medical + details.Pref + details.Friends + details.RowBonus + details.Enemies
 
-	maxPossible := 0.0
-	currentGood := 0.0
+	maxPossible := w.RowBonus
 
 	if len(student.mCols) > 0 || len(student.mRows) > 0 {
 		maxPossible += w.MedPenalty
-		if mScore > 0 {
-			currentGood += w.MedPenalty
-		}
 	}
 
 	if len(student.PreferredColumns) > 0 || len(student.PreferredRows) > 0 {
 		maxPossible += w.PrefBonus
-		if pScore > 0 {
-			currentGood += pScore * w.PrefBonus
-		}
 	}
 
 	if friendsCount[studentIndex] > 0 {
 		maxPossible += w.FriendBonus
-		currentGood += fScore * w.FriendBonus
 	}
+
+	currentGood := (mScore * w.MedPenalty) + (pScore * w.PrefBonus) +
+		(fScore * w.FriendBonus) + (rScore * w.RowBonus) - (ePenalty * w.EnemyPenalty)
 
 	if maxPossible <= 0 {
 		details.Level = 1.0
 	} else {
 		details.Level = currentGood / maxPossible
-		if details.Level > 1.0 {
-			details.Level = 1.0
-		}
+	}
+
+	if details.Level < 0 {
+		details.Level = 0.0
+	}
+	if details.Level > 1.0 {
+		details.Level = 1.0
 	}
 
 	if mScore < 0 {
-		details.Level = 0.0
 		details.Complaints = append(details.Complaints, "Нарушены медицинские показания")
 	}
 	if ePenalty > 0 {
-		details.Level *= 0.5
 		details.Complaints = append(details.Complaints, "Рядом сидит нежелательный человек")
 	}
 
