@@ -449,11 +449,8 @@ func RunGA(req Request) ([]Response, float64, int) {
 
 	bestFitnessEver := -math.MaxFloat64
 	stagnationCounter := 0
-	stagnationLimit := 200 // Stop if no improvement for 150 generations
+	stagnationLimit := 400 // Stop if no improvement for 400 generations
 	totalGens := 1
-	if nStudents < 20 {
-		stagnationLimit = 80
-	} // Faster stop for small classes
 
 	for gen := 0; gen < generations; gen++ {
 		chunkSize := (popSize + numCPU - 1) / numCPU
