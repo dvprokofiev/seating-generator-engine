@@ -165,41 +165,74 @@ func isSameDesk(col1, col2 int, seatType string) bool {
 	return col1/seatsPerDesk == col2/seatsPerDesk
 }
 
-func checkMed(student optStudent, row, col int) float64 {
+func decay(d int, lambda float64) float64 {
+	return math.Exp(-lambda * float64(d))
+}
+
+func checkMed(student optStudent, row, col int, config ClassConfig) float64 {
 	if len(student.mCols) == 0 && len(student.mRows) == 0 {
 		return 0.0
 	}
-	rowMatch, colMatch := student.mRows[row], student.mCols[col]
-	if len(student.mRows) > 0 && len(student.mCols) > 0 {
-		if rowMatch && colMatch {
-			return 1.0
+
+	score := 0.0
+	count := 0.0
+
+	if len(student.mCols) > 0 {
+		minDist := config.Columns + 1
+		for pc := range student.mCols {
+			if d := abs(col - pc); d < minDist {
+				minDist = d
+			}
 		}
-		if rowMatch || colMatch {
-			return 0.0
-		}
+		score += decay(minDist, 1.0)
+		count++
 	}
-	return -1.0
+
+	if len(student.mRows) > 0 {
+		minDist := config.Rows + 1
+		for pc := range student.mRows {
+			if d := abs(row - pc); d < minDist {
+				minDist = d
+			}
+		}
+		score += decay(minDist, 1.0)
+		count++
+	}
+
+	return score / count
 }
 
-func checkPref(student optStudent, row, col int) float64 {
-	score := 0.0
-	maxPossible := 0.0
-	if len(student.pCols) > 0 {
-		maxPossible += 1.0
-	}
-	if len(student.pRows) > 0 {
-		maxPossible += 1.0
-	}
-	if maxPossible == 0 {
+func checkPref(student optStudent, row, col int, config ClassConfig) float64 {
+	if len(student.pCols) == 0 && len(student.pRows) == 0 {
 		return 0.0
 	}
-	if student.pCols[col] {
-		score += 1.0
+
+	score := 0.0
+	count := 0.0
+
+	if len(student.pCols) > 0 {
+		minDist := config.Columns + 1
+		for pc := range student.pCols {
+			if d := abs(col - pc); d < minDist {
+				minDist = d
+			}
+		}
+		score += decay(minDist, 0.4)
+		count++
 	}
-	if student.pRows[row] {
-		score += 1.0
+
+	if len(student.pRows) > 0 {
+		minDist := config.Rows + 1
+		for pr := range student.pRows {
+			if d := abs(row - pr); d < minDist {
+				minDist = d
+			}
+		}
+		score += decay(minDist, 0.4)
+		count++
 	}
-	return score / maxPossible
+
+	return score / count
 }
 
 func checkFriends(studentIdx int, seating []int, row, col int, config ClassConfig, friends SocialMap, n int, friendsCount []int) float64 {
@@ -410,8 +443,8 @@ func RunGA(req Request) ([]Response, float64, int) {
 	for i := 0; i < nStudents; i++ {
 		for seatIdx := 0; seatIdx < N; seatIdx++ {
 			r, c := seatIdx/req.ClassConfig.Columns, seatIdx%req.ClassConfig.Columns
-			mScore := checkMed(opt[i], r, c)
-			pScore := checkPref(opt[i], r, c)
+			mScore := checkMed(opt[i], r, c, req.ClassConfig)
+			pScore := checkPref(opt[i], r, c, req.ClassConfig)
 			rScore := scorePosition(r, req.ClassConfig.Rows)
 
 			if mScore > 0 {
@@ -565,8 +598,8 @@ func getSatisfactionDetails(seating []int, row, col, studentIndex int, w Weights
 	var details SatisfactionDetails
 	student := students[studentIndex]
 
-	mScore := checkMed(student, row, col)
-	pScore := checkPref(student, row, col)
+	mScore := checkMed(student, row, col, config)
+	pScore := checkPref(student, row, col, config)
 	fScore := checkFriends(studentIndex, seating, row, col, config, friends, len(students), friendsCount)
 	ePenalty := checkEnemies(studentIndex, seating, row, col, config, enemies, len(students), enemiesCount)
 	rScore := scorePosition(row, config.Rows)
