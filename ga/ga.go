@@ -184,18 +184,28 @@ func checkMed(student optStudent, row, col int, config ClassConfig) float64 {
 				minDist = d
 			}
 		}
-		score += decay(minDist, 1.0)
+
+		val := decay(minDist, 1.2)
+		if minDist > 1 {
+			val -= 0.5
+		}
+		score += val
 		count++
 	}
 
 	if len(student.mRows) > 0 {
 		minDist := config.Rows + 1
-		for pc := range student.mRows {
-			if d := abs(row - pc); d < minDist {
+		for pr := range student.mRows {
+			if d := abs(row - pr); d < minDist {
 				minDist = d
 			}
 		}
-		score += decay(minDist, 1.0)
+
+		val := decay(minDist, 1.5)
+		if minDist > 0 {
+			val -= 1.0
+		}
+		score += val
 		count++
 	}
 
