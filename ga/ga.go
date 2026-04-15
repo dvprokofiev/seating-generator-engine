@@ -174,9 +174,7 @@ func checkMed(student optStudent, row, col int, config ClassConfig) float64 {
 		return 0.0
 	}
 
-	score := 0.0
-	count := 0.0
-
+	colScore := 1.0
 	if len(student.mCols) > 0 {
 		minDist := config.Columns + 1
 		for pc := range student.mCols {
@@ -184,15 +182,10 @@ func checkMed(student optStudent, row, col int, config ClassConfig) float64 {
 				minDist = d
 			}
 		}
-
-		val := decay(minDist, 1.2)
-		if minDist > 1 {
-			val -= 0.5
-		}
-		score += val
-		count++
+		colScore = decay(minDist, 1.5)
 	}
 
+	rowScore := 1.0
 	if len(student.mRows) > 0 {
 		minDist := config.Rows + 1
 		for pr := range student.mRows {
@@ -200,16 +193,10 @@ func checkMed(student optStudent, row, col int, config ClassConfig) float64 {
 				minDist = d
 			}
 		}
-
-		val := decay(minDist, 1.5)
-		if minDist > 0 {
-			val -= 1.0
-		}
-		score += val
-		count++
+		rowScore = decay(minDist, 2.0)
 	}
 
-	return score / count
+	return (colScore + rowScore) / 2.0
 }
 
 func checkPref(student optStudent, row, col int, config ClassConfig) float64 {
@@ -217,9 +204,7 @@ func checkPref(student optStudent, row, col int, config ClassConfig) float64 {
 		return 0.0
 	}
 
-	score := 0.0
-	count := 0.0
-
+	colScore := 1.0
 	if len(student.pCols) > 0 {
 		minDist := config.Columns + 1
 		for pc := range student.pCols {
@@ -227,10 +212,10 @@ func checkPref(student optStudent, row, col int, config ClassConfig) float64 {
 				minDist = d
 			}
 		}
-		score += decay(minDist, 0.4)
-		count++
+		colScore = decay(minDist, 0.5)
 	}
 
+	rowScore := 1.0
 	if len(student.pRows) > 0 {
 		minDist := config.Rows + 1
 		for pr := range student.pRows {
@@ -238,11 +223,10 @@ func checkPref(student optStudent, row, col int, config ClassConfig) float64 {
 				minDist = d
 			}
 		}
-		score += decay(minDist, 0.4)
-		count++
+		rowScore = decay(minDist, 0.5)
 	}
 
-	return score / count
+	return (colScore + rowScore) / 2.0
 }
 
 func checkFriends(studentIdx int, seating []int, row, col int, config ClassConfig, friends SocialMap, n int, friendsCount []int) float64 {
@@ -457,13 +441,7 @@ func RunGA(req Request) ([]Response, float64, int) {
 			pScore := checkPref(opt[i], r, c, req.ClassConfig)
 			rScore := scorePosition(r, req.ClassConfig.Rows)
 
-			if mScore > 0 {
-				mScore = weights.MedPenalty
-			} else if mScore < 0 {
-				mScore = -weights.MedPenalty
-			}
-
-			staticScores[i*N+seatIdx] = (pScore * weights.PrefBonus) + (rScore * weights.RowBonus) + mScore
+			staticScores[i*N+seatIdx] = (pScore * weights.PrefBonus) + (rScore * weights.RowBonus) + (mScore * weights.MedPenalty)
 		}
 	}
 
