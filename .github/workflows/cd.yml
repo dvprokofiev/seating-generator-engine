@@ -1,8 +1,7 @@
-name: Build and Push Go Backend Engine Docker Image
+name: Release
 
 on:
   push:
-    branches: ["main", "master"]
     tags: ["v*.*.*"]
 
 env:
@@ -10,22 +9,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  lint:
-    name: Lint Code
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.24.2"
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-
   build-and-push:
     runs-on: ubuntu-latest
-    needs: lint
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
@@ -63,7 +48,7 @@ jobs:
   create-release-draft:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-and-push, lint]
+    needs: [build-and-push]
     permissions:
       contents: write
     steps:
