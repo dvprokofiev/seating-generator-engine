@@ -106,9 +106,9 @@ func calculateWeights(pw PriorityWeights) Weights {
 	return Weights{
 		RowBonus:     float64(pw.Fill),
 		PrefBonus:    float64(pw.Preferences),
-		FriendBonus:  float64(pw.Friends),
+		FriendBonus:  float64(pw.Friends) / 2.0,
 		MedPenalty:   float64(pw.Medical),
-		EnemyPenalty: float64(pw.Enemies),
+		EnemyPenalty: float64(pw.Enemies) / 2.0,
 	}
 }
 
